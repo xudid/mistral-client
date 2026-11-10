@@ -1,5 +1,6 @@
 {
     "name": "xudid/mistral-client",
+    "license": "GPL-3.0-or-later",
     "require": {
         "guzzlehttp/guzzle": "^8.3"
     },

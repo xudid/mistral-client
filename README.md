@@ -40,3 +40,7 @@ $messages = [
     new AssistantMessage('Continue from this prefix', prefix: true),
 ];
 ```
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 or later. See [LICENSE](LICENSE) for the full text.
