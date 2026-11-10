@@ -1,0 +1,28 @@
+{
+    "name": "xudid/mistral-client",
+    "require": {
+        "guzzlehttp/guzzle": "^8.3"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^13.4"
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "autoload": {
+        "psr-4": {
+            "Xudid\\MistralClient\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Xudid\\MistralClient\\Tests\\": "tests/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Didier Moindreau",
+            "email": "dd4m@proton.me"
+        }
+    ]
+}
