@@ -2,23 +2,19 @@
 
 namespace Xudid\MistralClient\Message;
 
-use JsonSerializable;
-
-final class AssistantMessage implements JsonSerializable
+final class AssistantMessage extends Message
 {
     public function __construct(
-        private string|array|null $content = null,
+        string|array|null $content = null,
         private ?array $toolCalls = null,
         private ?bool $prefix = null
     ) {
+        parent::__construct('assistant', $content);
     }
 
     public function jsonSerialize(): array
     {
-        $message = [
-            'role' => 'assistant',
-            'content' => $this->content,
-        ];
+        $message = parent::jsonSerialize();
 
         if ($this->toolCalls !== null) {
             $message['tool_calls'] = $this->toolCalls;

@@ -2,19 +2,10 @@
 
 namespace Xudid\MistralClient\Message;
 
-use JsonSerializable;
-
-final class UserMessage implements JsonSerializable
+final class UserMessage extends Message
 {
-    public function __construct(private string|array $content)
+    public function __construct(string|array $content)
     {
-    }
-
-    public function jsonSerialize(): array
-    {
-        return [
-            'role' => 'user',
-            'content' => $this->content,
-        ];
+        parent::__construct('user', $content);
     }
 }

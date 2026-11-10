@@ -14,12 +14,38 @@ use JsonException;
 use PHPUnit\Framework\TestCase;
 use Xudid\MistralClient\Mistral;
 use Xudid\MistralClient\Message\AssistantMessage;
+use Xudid\MistralClient\Message\Message;
 use Xudid\MistralClient\Message\SystemMessage;
 use Xudid\MistralClient\Message\ToolMessage;
 use Xudid\MistralClient\Message\UserMessage;
 
 final class MistralTest extends TestCase
 {
+    public function testMessagesExtendCommonBaseAndPreserveNamedArguments(): void
+    {
+        $messages = [
+            new UserMessage(content: 'Hello'),
+            new SystemMessage(content: 'You are helpful.'),
+            new AssistantMessage(content: 'Working', toolCalls: null, prefix: false),
+            new ToolMessage(content: 'Done', toolCallId: 'call_123', name: 'calculator'),
+        ];
+
+        foreach ($messages as $message) {
+            self::assertInstanceOf(Message::class, $message);
+        }
+
+        self::assertSame(['role' => 'user', 'content' => 'Hello'], $messages[0]->jsonSerialize());
+        self::assertSame(['role' => 'system', 'content' => 'You are helpful.'], $messages[1]->jsonSerialize());
+        self::assertSame(
+            ['role' => 'assistant', 'content' => 'Working', 'prefix' => false],
+            $messages[2]->jsonSerialize()
+        );
+        self::assertSame(
+            ['role' => 'tool', 'content' => 'Done', 'tool_call_id' => 'call_123', 'name' => 'calculator'],
+            $messages[3]->jsonSerialize()
+        );
+    }
+
     public function testCompleteSendsAuthenticatedChatCompletionRequest(): void
     {
         $messages = [['role' => 'user', 'content' => [['type' => 'text', 'text' => 'Hello']]]];
