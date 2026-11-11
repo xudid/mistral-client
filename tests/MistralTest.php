@@ -18,6 +18,7 @@ use Xudid\MistralClient\Message\Message;
 use Xudid\MistralClient\Message\SystemMessage;
 use Xudid\MistralClient\Message\ToolMessage;
 use Xudid\MistralClient\Message\UserMessage;
+use Xudid\MistralClient\ResponseFormat;
 
 final class MistralTest extends TestCase
 {
@@ -74,6 +75,108 @@ final class MistralTest extends TestCase
         self::assertSame(
             ['model' => 'mistral-large-latest', 'messages' => $messages],
             json_decode((string) $history[0]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR)
+        );
+    }
+
+    public function testCompleteSendsConfiguredResponseFormats(): void
+    {
+        $messages = [['role' => 'user', 'content' => 'Return a result.']];
+        $responseFormats = [
+            new ResponseFormat('json_object'),
+            new ResponseFormat('text'),
+            new ResponseFormat('json_schema', [
+                'name' => 'result',
+                'schema' => [
+                    'type' => 'object',
+                    'properties' => ['value' => ['type' => 'string']],
+                    'required' => ['value'],
+                ],
+            ]),
+        ];
+        $history = [];
+        $httpClient = $this->createMockClient([
+            new Response(200, [], '{"id":"json-object"}'),
+            new Response(200, [], '{"id":"text"}'),
+            new Response(200, [], '{"id":"json-schema"}'),
+        ], $history);
+        $client = new Mistral('test-api-key', $httpClient);
+
+        foreach ($responseFormats as $responseFormat) {
+            $client->chat->responseFormat($responseFormat);
+            $client->chat->complete('mistral-large-latest', $messages);
+        }
+
+        self::assertCount(3, $history);
+        self::assertCount(2, (new \ReflectionMethod($client->chat, 'complete'))->getParameters());
+        foreach ($responseFormats as $index => $responseFormat) {
+            self::assertSame(
+                [
+                    'model' => 'mistral-large-latest',
+                    'messages' => $messages,
+                    'response_format' => $responseFormat->jsonSerialize(),
+                ],
+                json_decode((string) $history[$index]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR)
+            );
+        }
+    }
+
+    public function testResponseFormatCanBeConfiguredFluentlyReplacedAndCleared(): void
+    {
+        $messages = [['role' => 'user', 'content' => 'Return a result.']];
+        $configuredFormat = new ResponseFormat('json_object');
+        $overrideFormat = new ResponseFormat('json_schema', [
+            'name' => 'result',
+            'schema' => [
+                'type' => 'object',
+                'properties' => ['value' => ['type' => 'string']],
+                'required' => ['value'],
+            ],
+        ]);
+        $history = [];
+        $httpClient = $this->createMockClient([
+            new Response(200, [], '{"id":"configured-first"}'),
+            new Response(200, [], '{"id":"configured-second"}'),
+            new Response(200, [], '{"id":"override"}'),
+            new Response(200, [], '{"id":"cleared"}'),
+        ], $history);
+        $client = new Mistral('test-api-key', $httpClient);
+
+        self::assertSame($client->chat, $client->chat->responseFormat($configuredFormat));
+        $client->chat->complete('mistral-large-latest', $messages);
+        $client->chat->complete('mistral-large-latest', $messages);
+        $client->chat->responseFormat($overrideFormat);
+        $client->chat->complete('mistral-large-latest', $messages);
+        $client->chat->responseFormat(null);
+        $client->chat->complete('mistral-large-latest', $messages);
+
+        self::assertSame(
+            ['type' => 'json_object'],
+            json_decode((string) $history[0]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR)['response_format']
+        );
+        self::assertSame(
+            ['type' => 'json_object'],
+            json_decode((string) $history[1]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR)['response_format']
+        );
+        self::assertSame(
+            $overrideFormat->jsonSerialize(),
+            json_decode((string) $history[2]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR)['response_format']
+        );
+        self::assertSame(
+            ['model' => 'mistral-large-latest', 'messages' => $messages],
+            json_decode((string) $history[3]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR)
+        );
+    }
+
+    public function testResponseFormatSerializesNestedSchemaAndEmptyObjects(): void
+    {
+        $responseFormat = new ResponseFormat('json_schema', [
+            'name' => 'result',
+            'schema' => (object) [],
+        ]);
+
+        self::assertSame(
+            '{"type":"json_schema","json_schema":{"name":"result","schema":{}}}',
+            json_encode($responseFormat, JSON_THROW_ON_ERROR)
         );
     }
 

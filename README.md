@@ -12,6 +12,7 @@ use Xudid\MistralClient\Message\AssistantMessage;
 use Xudid\MistralClient\Message\SystemMessage;
 use Xudid\MistralClient\Message\ToolMessage;
 use Xudid\MistralClient\Message\UserMessage;
+use Xudid\MistralClient\ResponseFormat;
 
 $client = new Mistral(apiKey: getenv('MISTRAL_API_KEY'));
 $response = $client->chat->complete(
@@ -23,6 +24,28 @@ echo $response['choices'][0]['message']['content'];
 ```
 
 `complete()` sends a synchronous request to the chat-completions endpoint and returns the full decoded JSON response as an associative array. HTTP and network errors are raised by Guzzle, and invalid JSON responses raise `JsonException`.
+
+Configure a response format to enable text, JSON, or JSON Schema output. The configured format is reused across calls until you replace or clear it:
+
+```php
+$client->chat->responseFormat(new ResponseFormat('json_object'));
+$response = $client->chat->complete(
+    model: 'mistral-large-latest',
+    messages: [new UserMessage('Return a short answer as JSON.')]
+);
+
+$client->chat->responseFormat(new ResponseFormat('json_schema', [
+    'name' => 'result',
+    'schema' => ['type' => 'object', 'properties' => ['value' => ['type' => 'string']]],
+]));
+$response = $client->chat->complete(
+    model: 'mistral-large-latest',
+    messages: [new UserMessage('Respond using the requested schema.')]
+);
+$client->chat->responseFormat(null); // Clear the configured format.
+```
+
+For JSON mode, prompt the model to produce JSON. The configured `ResponseFormat` is sent as Mistral's `response_format` field; see the [chat completion API documentation](https://docs.mistral.ai/fr/api/endpoint/chat#operation-chat_completion_v1_chat_completions_post) for supported formats and JSON Schema options.
 
 `SystemMessage`, `AssistantMessage`, and `ToolMessage` can also be used to construct conversation messages. Assistant tool calls and tool results retain their metadata when serialized:
 
