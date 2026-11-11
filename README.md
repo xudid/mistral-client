@@ -47,6 +47,36 @@ $client->chat->responseFormat(null); // Clear the configured format.
 
 For JSON mode, prompt the model to produce JSON. The configured `ResponseFormat` is sent as Mistral's `response_format` field; see the [chat completion API documentation](https://docs.mistral.ai/fr/api/endpoint/chat#operation-chat_completion_v1_chat_completions_post) for supported formats and JSON Schema options.
 
+Configure function tools and a tool choice for chat completions. Tool settings are reused until replaced or cleared:
+
+```php
+$client->chat
+    ->tools([[
+        'type' => 'function',
+        'function' => [
+            'name' => 'get_weather',
+            'description' => 'Get the current weather for a location.',
+            'parameters' => [
+                'type' => 'object',
+                'properties' => ['location' => ['type' => 'string']],
+                'required' => ['location'],
+            ],
+        ],
+    ]])
+    ->toolChoice('auto');
+
+$response = $client->chat->complete(
+    model: 'mistral-large-latest',
+    messages: [new UserMessage('What is the weather in Paris?')]
+);
+
+// Select a particular function or clear the configuration.
+$client->chat->toolChoice(['type' => 'function', 'function' => ['name' => 'get_weather']]);
+$client->chat->tools(null)->toolChoice(null);
+```
+
+Tool definitions are sent as Mistral's `tools` field, and the configured string or structured choice is sent as `tool_choice`.
+
 `SystemMessage`, `AssistantMessage`, and `ToolMessage` can also be used to construct conversation messages. Assistant tool calls and tool results retain their metadata when serialized:
 
 ```php

@@ -167,6 +167,84 @@ final class MistralTest extends TestCase
         );
     }
 
+    public function testToolsAndToolChoiceCanBeConfiguredFluentlyReplacedAndCleared(): void
+    {
+        $messages = [['role' => 'user', 'content' => 'What is the weather?']];
+        $tools = [[
+            'type' => 'function',
+            'function' => [
+                'name' => 'get_weather',
+                'description' => 'Get the current weather.',
+                'parameters' => (object) [],
+            ],
+        ]];
+        $replacementTools = [[
+            'type' => 'function',
+            'function' => [
+                'name' => 'get_forecast',
+                'description' => 'Get a weather forecast.',
+                'parameters' => [
+                    'type' => 'object',
+                    'properties' => ['location' => ['type' => 'string']],
+                    'required' => ['location'],
+                ],
+            ],
+        ]];
+        $toolChoice = ['type' => 'function', 'function' => ['name' => 'get_forecast']];
+        $history = [];
+        $httpClient = $this->createMockClient([
+            new Response(200, [], '{"id":"first"}'),
+            new Response(200, [], '{"id":"persistent"}'),
+            new Response(200, [], '{"id":"replaced"}'),
+            new Response(200, [], '{"id":"choice-cleared"}'),
+            new Response(200, [], '{"id":"empty-tools"}'),
+            new Response(200, [], '{"id":"tools-cleared"}'),
+        ], $history);
+        $client = new Mistral('test-api-key', $httpClient);
+        $client->chat->responseFormat(new ResponseFormat('json_object'));
+
+        self::assertSame($client->chat, $client->chat->tools($tools));
+        self::assertSame($client->chat, $client->chat->toolChoice('auto'));
+        $client->chat->complete('mistral-large-latest', $messages);
+        $client->chat->complete('mistral-large-latest', $messages);
+        $client->chat->tools($replacementTools)->toolChoice($toolChoice);
+        $client->chat->complete('mistral-large-latest', $messages);
+        $client->chat->toolChoice(null);
+        $client->chat->complete('mistral-large-latest', $messages);
+        $client->chat->tools([]);
+        $client->chat->complete('mistral-large-latest', $messages);
+        $client->chat->tools(null);
+        $client->chat->complete('mistral-large-latest', $messages);
+
+        self::assertCount(6, $history);
+        $firstRequest = json_decode((string) $history[0]['request']->getBody(), false, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('json_object', $firstRequest->response_format->type);
+        self::assertSame('auto', $firstRequest->tool_choice);
+        self::assertSame('get_weather', $firstRequest->tools[0]->function->name);
+        self::assertInstanceOf(\stdClass::class, $firstRequest->tools[0]->function->parameters);
+
+        $persistentRequest = json_decode((string) $history[1]['request']->getBody(), false, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('auto', $persistentRequest->tool_choice);
+        self::assertSame('get_weather', $persistentRequest->tools[0]->function->name);
+
+        $replacedRequest = json_decode((string) $history[2]['request']->getBody(), false, 512, JSON_THROW_ON_ERROR);
+        self::assertSame('get_forecast', $replacedRequest->tools[0]->function->name);
+        self::assertSame($toolChoice, json_decode(json_encode($replacedRequest->tool_choice, JSON_THROW_ON_ERROR), true, 512, JSON_THROW_ON_ERROR));
+
+        $choiceClearedRequest = json_decode((string) $history[3]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertArrayNotHasKey('tool_choice', $choiceClearedRequest);
+        self::assertSame('get_forecast', $choiceClearedRequest['tools'][0]['function']['name']);
+
+        $emptyToolsRequest = json_decode((string) $history[4]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertSame([], $emptyToolsRequest['tools']);
+        self::assertArrayNotHasKey('tool_choice', $emptyToolsRequest);
+
+        $clearedRequest = json_decode((string) $history[5]['request']->getBody(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertArrayNotHasKey('tools', $clearedRequest);
+        self::assertArrayNotHasKey('tool_choice', $clearedRequest);
+        self::assertSame('json_object', $clearedRequest['response_format']['type']);
+    }
+
     public function testResponseFormatSerializesNestedSchemaAndEmptyObjects(): void
     {
         $responseFormat = new ResponseFormat('json_schema', [

@@ -10,6 +10,8 @@ final class Chat
     private const COMPLETIONS_ENDPOINT = 'https://api.mistral.ai/v1/chat/completions';
 
     private ?ResponseFormat $responseFormat = null;
+    private ?array $tools = null;
+    private string|array|null $toolChoice = null;
 
     public function __construct(
         private string $apiKey,
@@ -20,6 +22,20 @@ final class Chat
     public function responseFormat(?ResponseFormat $responseFormat): self
     {
         $this->responseFormat = $responseFormat;
+
+        return $this;
+    }
+
+    public function tools(?array $tools): self
+    {
+        $this->tools = $tools;
+
+        return $this;
+    }
+
+    public function toolChoice(string|array|null $toolChoice): self
+    {
+        $this->toolChoice = $toolChoice;
 
         return $this;
     }
@@ -35,6 +51,12 @@ final class Chat
         ];
         if ($this->responseFormat !== null) {
             $requestBody['response_format'] = $this->responseFormat->jsonSerialize();
+        }
+        if ($this->tools !== null) {
+            $requestBody['tools'] = $this->tools;
+        }
+        if ($this->toolChoice !== null) {
+            $requestBody['tool_choice'] = $this->toolChoice;
         }
 
         $response = $this->httpClient->request('POST', self::COMPLETIONS_ENDPOINT, [
